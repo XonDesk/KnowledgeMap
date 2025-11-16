@@ -21,7 +21,7 @@ The codebase follows a **dispatcher-handler** architecture:
 2. **Handler Scripts** (Format-specific processors)
    - `text_handler.py` - Processes .txt, .md, .markdown, .doc, .docx files
    - `audio_handler.py` - Processes audio/video files (.mp3, .wav, .mp4, etc.) using WhisperX with speaker diarization
-   - `pdf_handler.py` - (Referenced but not present in codebase)
+   - `pdf_handler.py` - Processes .pdf files using pluggable PDF processors (default: MinerU)
    
    All handlers convert input to markdown format and save to `library/` folder.
 
@@ -90,6 +90,17 @@ Process a single audio file:
 python audio_handler.py "D:\path\to\audio.mp3"
 ```
 
+Process a single PDF file:
+```powershell
+python pdf_handler.py "D:\path\to\document.pdf"
+```
+
+Process a PDF with a specific processor (mineru or pypdf2):
+```powershell
+python pdf_handler.py "D:\path\to\document.pdf" mineru
+python pdf_handler.py "D:\path\to\document.pdf" pypdf2
+```
+
 ### Embedding Operations
 
 Embed a single markdown document:
@@ -138,6 +149,33 @@ Audio processing uses WhisperX with 4 stages:
 
 Requires CUDA for optimal performance but falls back to CPU with int8 quantization.
 
+### PDF Processing System
+The PDF handler uses a pluggable processor architecture allowing easy swapping of PDF processing tools:
+
+**Available Processors:**
+- `MinerUProcessor` - Uses MinerU for high-quality PDF to markdown conversion (default)
+  - Preserves document structure (headings, paragraphs, lists)
+  - Extracts images and tables
+  - Converts formulas to LaTeX
+  - Handles complex layouts (multi-column, headers/footers)
+  - Extracts images to `library/images/<pdf_name>/` folder
+
+- `PyPDF2Processor` - Fallback for basic text-only extraction
+  - Simple text extraction without layout preservation
+  - Lightweight with minimal dependencies
+  - Good for basic text-only PDFs
+
+**Adding a New PDF Processor:**
+1. Create a new class that inherits from `PDFProcessor`
+2. Implement three methods:
+   - `check_dependencies()` - Check if required libraries are installed
+   - `get_installation_instructions()` - Return installation guide string
+   - `process_pdf(pdf_path, output_path)` - Convert PDF to markdown
+3. Add your processor to the `processors` dict in `get_pdf_processor()`
+4. The system auto-selects the first available processor or accepts explicit selection
+
+All PDF processors output markdown with YAML frontmatter containing metadata (source file, conversion date, converter name).
+
 ### Neo4j Vector Index
 Documents are stored with properties:
 - `id` - Document identifier (defaults to filename stem)
@@ -156,6 +194,8 @@ Key dependencies (install as needed):
 - `torch` - PyTorch for embedding models
 - `python-docx` - Word document processing
 - `whisperx` - Audio transcription with diarization
+- `mineru[core]` - PDF processing with MinerU (recommended)
+- `PyPDF2` - Alternative PDF text extraction (fallback)
 - `openai` - OpenAI API client (optional)
 - `cohere` - Cohere API client (optional)
 
